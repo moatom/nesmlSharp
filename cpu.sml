@@ -117,11 +117,11 @@ datatype instruction =
   | CMP of operand
   | CPX of operand
   | CPY of operand
-  | DEC of address
+  | DEC of operand
   | DEX of address
   | DEY of address
   | EOR of operand
-  | INC of address
+  | INC of operand
   | INX of address
   | INY of address
   | JMP of address
@@ -129,15 +129,15 @@ datatype instruction =
   | LDA of operand
   | LDX of operand
   | LDY of operand
-  | LSR of address
+  | LSR of operand
   | NOP of address
   | ORA of operand
   | PHA of address
   | PHP of address
   | PLA of address
   | PLP of address
-  | ROL of address
-  | ROR of address
+  | ROL of operand
+  | ROR of operand
   | RTI of address
   | RTS of address
   | SBC of operand
@@ -154,12 +154,35 @@ datatype instruction =
   | TXS of address
   | TYA of address
 
+fun b2w bin = if bin then 0w1 else 0w0
+fun w2b word = if word = 0w0 then false else true
+fun p2Word p =
+      (if #N  p  then 0w128 else 0w0)
+    + (if #V  p  then 0w64  else 0w0)
+    + (if #B5 p  then 0w32  else 0w0)
+    + (if #B4 p  then 0w16  else 0w0)
+    + (if #D  p  then 0w8   else 0w0)
+    + (if #I  p  then 0w4   else 0w0)
+    + (if #Z  p  then 0w2   else 0w0)
+    + (if #C  p  then 0w1   else 0w0)
+fun word2P w8 =
+    {N  = (Word8.andb (w8, 0wx80) = 0wx80),
+     V  = (Word8.andb (w8, 0wx40) = 0wx40),
+     B5 = (Word8.andb (w8, 0wx20) = 0wx20),
+     B4 = (Word8.andb (w8, 0wx10) = 0wx10),
+     D  = (Word8.andb (w8, 0wx04) = 0wx04),
+     I  = (Word8.andb (w8, 0wx03) = 0wx03),
+     Z  = (Word8.andb (w8, 0wx02) = 0wx02),
+     C  = (Word8.andb (w8, 0wx01) = 0wx01)}
+fun checkV (A, B, C): bool = not (w2b (Word8.>> ((Word8.xorb (A, B)), 0w7))) andalso w2b (Word8.>> ((Word8.xorb (A, C)), 0w7))
 
+exception InvaildInstruction
 (* val exec : registers * instruction -> registers *)
 fun exec (regs, insn) =
     case insn of
-      ADC x => let val v1 = value (regs, x) val v2 = v1 + #A regs in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}} end
+      ADC x => let val v1 = value (regs, x) val v2 = v1 + #A regs + b2w (#C (#P regs)) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), V = checkV (#A regs, v1, v2) ,Z = (v2=0w0), C = (v2 < #A regs)}} end
     | AND x => let val v1 = value (regs, x) val v2 = Word8.andb (#A regs, v1) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}} end
+    | ASL (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 * 0w2 in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}} end
     | ASL (Address x) => let val v1 = value (regs, Address x) val v2 = v1 * 0w2 in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}}) end
     | BCC x => (if not (#C (#P regs)) then regs # {PC = address (regs, x)} else regs)
     | BCS x => (if #C (#P regs) then regs # {PC = address (regs, x)} else regs)
@@ -172,48 +195,52 @@ fun exec (regs, insn) =
     | BVC x => (if not (#V (#P regs)) then regs # {PC = address (regs, x)} else regs)
     | BVS x => (if #V (#P regs) then regs # {PC = address (regs, x)} else regs)
     | CLC x => (regs # {P = (#P regs) # {C=false}})
-    | CLD x => regs
-    | CLI x => regs
-    | CLV x => regs
-    | CMP x => regs
-    | CPX x => regs
-    | CPY x => regs
-    | DEC x => regs
-    | DEX x => regs
-    | DEY x => regs
-    | EOR x => regs
-    | INC x => regs
-    | INX x => regs
-    | INY x => regs
+    | CLD x => (regs # {P = (#P regs) # {D=false}})
+    | CLI x => (regs # {P = (#P regs) # {I=false}})
+    | CLV x => (regs # {P = (#P regs) # {V=false}})
+    | CMP x => let val v1 = value (regs, x) val v2 = #A regs - v1 in regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = not (v2 > #A regs)}} end
+    | CPX x => let val v1 = value (regs, x) val v2 = #X regs - v1 in regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = not (v2 > #X regs)}} end
+    | CPY x => let val v1 = value (regs, x) val v2 = #Y regs - v1 in regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = not (v2 > #Y regs)}} end
+    | DEC (Address x) => let val v1 = value (regs, Address x) val v2 = v1 - 0w1 in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}}) end
+    | DEX x => let val v = #X regs - 0w1 in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
+    | DEY x => let val v = #Y regs - 0w1 in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
+    | EOR x => let val v1 = value (regs, x) val v2 = Word8.xorb (#A regs, v1) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}} end
+    | INC (Address x) => let val v1 = value (regs, Address x) val v2 = v1 + 0w1 in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}}) end
+    | INX x => let val v = #X regs + 0w1 in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
+    | INY x => let val v = #Y regs + 0w1 in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | JMP x => (regs # {PC = address (regs, x)})
     | JSR x => (write16 (0wx100+w8ToW16 (#S regs), #PC regs); regs # {S = (#S regs)-0w2, PC = address (regs, x)})
     | LDA x => let val v = value (regs, x) in regs # {A = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | LDX x => let val v = value (regs, x) in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
-    | LDY x => regs
-    | LSR x => regs
+    | LDY x => let val v = value (regs, x) in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
+    | LSR (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 div 0w2 in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}} end
+    | LSR (Address x) => let val v1 = value (regs, Address x) val v2 = v1 div 0w2 in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}}) end
     | NOP x => regs
-    | ORA x => regs
-    | PHA x => regs
-    | PHP x => regs
-    | PLA x => regs
-    | PLP x => regs
-    | ROL x => regs
-    | ROR x => regs
-    | RTI x => regs
+    | ORA x => let val v1 = value (regs, x) val v2 = Word8.orb (#A regs, v1) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}} end
+    | PHA x => (write (0wx100+w8ToW16 (#S regs), #A regs); regs # {S = (#S regs)-0w1})
+    | PHP x => (write (0wx100+w8ToW16 (#S regs), p2Word (#P regs)); regs # {S = (#S regs)-0w1})
+    | PLA x => let val v =  read (0wx100 + w8ToW16 ((#S regs) + 0w1)) in regs # {A = v, S = (#S regs) + 0w1, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
+    | PLP x => let val v =  Word8.orb (Word8.andb (read (0wx100 + w8ToW16 ((#S regs) + 0w1)), 0wxCF), Word8.andb (p2Word (#P regs), 0wx30)) in regs # {S = (#S regs) + 0w1, P = word2P v} end
+    | ROL (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 * 0w2 + b2w (#C (#P regs)) in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}} end
+    | ROL (Address x) => let val v1 = value (regs, Address x) val v2 = v1 * 0w2 + b2w (#C (#P regs)) in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}}) end
+    | ROR (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 div 0w2 + 0w128 * b2w (#C (#P regs)) in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}} end
+    | ROR (Address x) => let val v1 = value (regs, Address x) val v2 = v1 div 0w2 + 0w128 * b2w (#C (#P regs)) in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}}) end
+    | RTI x => let val v1 =  Word8.orb (Word8.andb (read (0wx100 + w8ToW16 ((#S regs) + 0w1)), 0wxCF), Word8.andb (p2Word (#P regs), 0wx30)) val v2 = read16 (0wx100 + w8ToW16 ((#S regs) + 0w2)) in regs # {PC = v2, S = (#S regs) + 0w3, P = word2P v1} end
     | RTS x => (regs # {PC = read16 (0wx100 + w8ToW16 ((#S regs) + 0w1)), S = (#S regs) + 0w2})
-    | SBC x => regs
+    | SBC x => let val v1 = 0w1 + Word8.notb (value (regs, x)) val v2 = v1 + #A regs - 0w1 + b2w (#C (#P regs)) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), V = checkV (#A regs, v1, v2) ,Z = (v2=0w0), C = (v2 < #A regs)}} end
     | SEC x => (regs # {P = (#P regs) # {C = true}})
-    | SED x => regs
-    | SEI x => regs
+    | SED x => (regs # {P = (#P regs) # {D = true}})
+    | SEI x => (regs # {P = (#P regs) # {I = true}})
     | STA x => (write (address (regs, x), #A regs); regs)
     | STX x => (write (address (regs, x), #X regs); regs)
     | STY x => (write (address (regs, x), #Y regs); regs)
-    | TAX x => regs
-    | TAY x => regs
-    | TSX x => regs
-    | TXA x => regs
-    | TXS x => regs
-    | TYA x => regs
+    | TAX x => (regs # {X = #A regs, P = (#P regs) # {N = (Word8.andb (#A regs, 0wx80) = 0wx80), Z = (#A regs = 0w0)}})
+    | TAY x => (regs # {Y = #A regs, P = (#P regs) # {N = (Word8.andb (#A regs, 0wx80) = 0wx80), Z = (#A regs = 0w0)}})
+    | TSX x => (regs # {X = #S regs, P = (#P regs) # {N = (Word8.andb (#S regs, 0wx80) = 0wx80), Z = (#S regs = 0w0)}})
+    | TXA x => (regs # {A = #X regs, P = (#P regs) # {N = (Word8.andb (#X regs, 0wx80) = 0wx80), Z = (#X regs = 0w0)}})
+    | TXS x => (regs # {S = #X regs})
+    | TYA x => (regs # {A = #Y regs, P = (#P regs) # {N = (Word8.andb (#Y regs, 0wx80) = 0wx80), Z = (#Y regs = 0w0)}})
+    | _     => raise InvaildInstruction
 
 exception FailedDecode
 fun fetchAndDecode (pc: word16): instruction * word16 =
@@ -252,57 +279,57 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
       | 0wx21 => (AND (Address (IndexedIndirect (read (pc + 0w1)))), pc + 0w2)
       | 0wx24 => (BIT (Address (zp ())), pc + 0w2)
       | 0wx25 => (AND (Address (zp ())), pc + 0w2)   
-      | 0wx26 => (ROL (zp ()), pc + 0w2)
+      | 0wx26 => (ROL (Address (zp ())), pc + 0w2)
       | 0wx28 => (PLP Implied, pc + 0w1)    
       | 0wx29 => (AND (imm ()), pc + 0w2)
-      | 0wx2A => (ROL Accumulator, pc + 0w1)
+      | 0wx2A => (ROL (Address Accumulator), pc + 0w1)
       | 0wx2C => (BIT (Address (abs ())), pc + 0w3)
       | 0wx2D => (AND (Address (abs ())), pc + 0w3)  
-      | 0wx2E => (ROL (abs ()), pc + 0w3)
+      | 0wx2E => (ROL (Address (abs ())), pc + 0w3)
       | 0wx30 => (BMI (rel ()), pc + 0w2) 
       | 0wx31 => (AND (Address (izy ())), pc + 0w2)
       | 0wx35 => (AND (Address (zpx ())), pc + 0w2)
-      | 0wx36 => (ROL (zpx ()), pc + 0w2)
+      | 0wx36 => (ROL (Address (zpx ())), pc + 0w2)
       | 0wx38 => (SEC Implied, pc + 0w1)   
       | 0wx39 => (AND (Address (aby ())), pc + 0w3)
       | 0wx3D => (AND (Address (abx ())), pc + 0w3)
-      | 0wx3E => (ROL (abx ()), pc + 0w3)
+      | 0wx3E => (ROL (Address (abx ())), pc + 0w3)
       | 0wx40 => (RTI Implied, pc + 0w1)
       | 0wx41 => (EOR (Address (izx ())), pc + 0w2)
       | 0wx45 => (EOR (Address (zp ())), pc + 0w2)
-      | 0wx46 => (LSR (zp ()), pc + 0w2)
+      | 0wx46 => (LSR (Address (zp ())), pc + 0w2)
       | 0wx48 => (PHA Implied, pc + 0w1)
       | 0wx49 => (EOR  (imm ()), pc + 0w2)
-      | 0wx4A => (LSR Accumulator, pc + 0w1)
+      | 0wx4A => (LSR (Address Accumulator), pc + 0w1)
       | 0wx4C => (JMP (Absolute (read16 (pc + 0w1))), pc + 0w3)
       | 0wx4D => (EOR (Address (abs ())), pc + 0w3)
-      | 0wx4E => (LSR (abs ()), pc + 0w3)
+      | 0wx4E => (LSR (Address (abs ())), pc + 0w3)
       | 0wx50 => (BVC (rel ()), pc + 0w2)
       | 0wx51 => (EOR (Address (izy ())), pc + 0w2) 
       | 0wx55 => (EOR (Address (zpx ())), pc + 0w2)  
-      | 0wx56 => (LSR (zpx ()), pc + 0w2)
+      | 0wx56 => (LSR (Address (zpx ())), pc + 0w2)
       | 0wx58 => (CLI Implied, pc + 0w1)
       | 0wx59 => (EOR (Address (aby ())), pc + 0w3)
       | 0wx5D => (EOR (Address (abx ())), pc + 0w3)  
-      | 0wx5E => (LSR (abx ()), pc + 0w3)
+      | 0wx5E => (LSR (Address (abx ())), pc + 0w3)
       | 0wx60 => (RTS Implied, pc + 0w1)   
       | 0wx61 => (ADC (Address (izx ())), pc + 0w2)
       | 0wx65 => (ADC (Address (zp ())), pc + 0w2)
-      | 0wx66 => (ROR (zp ()), pc + 0w2)
+      | 0wx66 => (ROR (Address (zp ())), pc + 0w2)
       | 0wx68 => (PLA Implied, pc + 0w1)
       | 0wx69 => (ADC (imm ()), pc + 0w2)
-      | 0wx6A => (ROR Accumulator, pc + 0w1)
+      | 0wx6A => (ROR (Address Accumulator), pc + 0w1)
       | 0wx6C => (JMP (ind ()), pc + 0w3)
       | 0wx6D => (ADC (Address (abs ())), pc + 0w3)
-      | 0wx6E => (ROR (abs ()), pc + 0w3)
+      | 0wx6E => (ROR (Address (abs ())), pc + 0w3)
       | 0wx70 => (BVS (rel ()), pc + 0w2)
       | 0wx71 => (ADC (Address (izy ())), pc + 0w2)
       | 0wx75 => (ADC (Address (zpx ())), pc + 0w2)
-      | 0wx76 => (ROR (zpx ()), pc + 0w2)
+      | 0wx76 => (ROR (Address (zpx ())), pc + 0w2)
       | 0wx78 => (SEI Implied, pc + 0w1)
       | 0wx79 => (ADC (Address (aby ())), pc + 0w3)
       | 0wx7D => (ADC (Address (abx ())), pc + 0w3)  
-      | 0wx7E => (ROR (abx ()), pc + 0w3)
+      | 0wx7E => (ROR (Address (abx ())), pc + 0w3)
       | 0wx81 => (STA (izx ()), pc + 0w2)
       | 0wx84 => (STY (zp ()), pc + 0w2) 
       | 0wx85 => (STA (zp ()), pc + 0w2)   
@@ -348,56 +375,41 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
       | 0wxC1 => (CMP (Address (izx ())), pc + 0w2)
       | 0wxC4 => (CPY (Address (zp ())), pc + 0w2)
       | 0wxC5 => (CMP (Address (zp ())), pc + 0w2)
-      | 0wxC6 => (DEC (zp ()), pc + 0w2)
+      | 0wxC6 => (DEC (Address (zp ())), pc + 0w2)
       | 0wxC8 => (INY Implied, pc + 0w1)
       | 0wxC9 => (CMP (imm ()), pc + 0w2)
       | 0wxCA => (DEX Implied, pc + 0w1)
       | 0wxCC => (CPY (Address (abs ())), pc + 0w3)
       | 0wxCD => (CMP (Address (abs ())), pc + 0w3)  
-      | 0wxCE => (DEC (abs ()), pc + 0w3)
+      | 0wxCE => (DEC (Address (abs ())), pc + 0w3)
       | 0wxD0 => (BNE (rel ()), pc + 0w2)
       | 0wxD1 => (CMP (Address (izy ())), pc + 0w2)
       | 0wxD5 => (CMP (Address (zpx ())), pc + 0w2)  
-      | 0wxD6 => (DEC (zpx ()), pc + 0w2)
+      | 0wxD6 => (DEC (Address (zpx ())), pc + 0w2)
       | 0wxD8 => (CLD Implied, pc + 0w1)
       | 0wxD9 => (CMP (Address (aby ())), pc + 0w3)
       | 0wxDD => (CMP (Address (abx ())), pc + 0w3)  
-      | 0wxDE => (DEC (abx ()), pc + 0w3)
+      | 0wxDE => (DEC (Address (abx ())), pc + 0w3)
       | 0wxE0 => (CPX (imm ()), pc + 0w2)
       | 0wxE1 => (SBC (Address (izx ())), pc + 0w2)
       | 0wxE4 => (CPX (Address (zp ())), pc + 0w2) 
       | 0wxE5 => (SBC (Address (zp ())), pc + 0w2)
-      | 0wxE6 => (INC (zp ()), pc + 0w2)   
+      | 0wxE6 => (INC (Address (zp ())), pc + 0w2)   
       | 0wxE8 => (INX Implied, pc + 0w1)
       | 0wxE9 => (SBC (imm ()), pc + 0w2)  
       | 0wxEA => (NOP Implied, pc + 0w1)
       | 0wxEC => (CPX (Address (abs ())), pc + 0w3)
       | 0wxED => (SBC (Address (abs ())), pc + 0w3)
-      | 0wxEE => (INC (abs ()), pc + 0w3)  
+      | 0wxEE => (INC (Address (abs ())), pc + 0w3)  
       | 0wxF0 => (BEQ (rel ()), pc + 0w2)
       | 0wxF1 => (SBC (Address (izy ())), pc + 0w2)  
       | 0wxF5 => (SBC (Address (zpx ())), pc + 0w2)
-      | 0wxF6 => (INC (zpx ()), pc + 0w2)  
+      | 0wxF6 => (INC (Address (zpx ())), pc + 0w2)  
       | 0wxF8 => (SED Implied, pc + 0w1)
       | 0wxF9 => (SBC (Address (aby ())), pc + 0w3)  
       | 0wxFD => (SBC (Address (abx ())), pc + 0w3)
-      | 0wxFE => (INC (abx ()), pc + 0w3)   
+      | 0wxFE => (INC (Address (abx ())), pc + 0w3)   
       | _     => raise FailedDecode
-    end
-
-fun p2Word p =
-    let
-      fun pow r 0 = 0w1
-        | pow r n = r * pow r (n-1);
-    in
-        (if #N  p  then pow 0w2 7 else 0w0)
-      + (if #V  p  then pow 0w2 6 else 0w0)
-      + (if #B5 p  then pow 0w2 5 else 0w0)
-      + (if #B4 p  then pow 0w2 4 else 0w0)
-      + (if #D  p  then pow 0w2 3 else 0w0)
-      + (if #I  p  then pow 0w2 2 else 0w0)
-      + (if #Z  p  then pow 0w2 1 else 0w0)
-      + (if #C  p  then pow 0w2 0 else 0w0)
     end
 
 fun prtRegs regs =
