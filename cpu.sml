@@ -191,7 +191,7 @@ fun exec (regs, insn) =
     | BMI x => (if #N (#P regs) then regs # {PC = address (regs, x)} else regs)
     | BNE x => (if not (#Z (#P regs)) then regs # {PC = address (regs, x)} else regs)
     | BPL x => (if not (#N (#P regs)) then regs # {PC = address (regs, x)} else regs)
-    | BRK x => (write16 (0wx100+w8ToW16 (#S regs), #PC regs); regs # {S = (#S regs)-0w1, PC = read16 0wxFFFE, P = (#P regs) # {B4=true, I=true}})
+    | BRK x => (write16 (0wx100 + w8ToW16 (#S regs), 0w1 + #PC regs); write (0wx100+w8ToW16 ((#S regs) - 0w2), p2Word (#P regs)); regs # {S = (#S regs)-0w3, PC = read16 0wxFFFE, P = (#P regs) # {B4=true, I=true}})
     | BVC x => (if not (#V (#P regs)) then regs # {PC = address (regs, x)} else regs)
     | BVS x => (if #V (#P regs) then regs # {PC = address (regs, x)} else regs)
     | CLC x => (regs # {P = (#P regs) # {C=false}})
@@ -209,7 +209,7 @@ fun exec (regs, insn) =
     | INX x => let val v = #X regs + 0w1 in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | INY x => let val v = #Y regs + 0w1 in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | JMP x => (regs # {PC = address (regs, x)})
-    | JSR x => (write16 (0wx100+w8ToW16 (#S regs), #PC regs); regs # {S = (#S regs)-0w2, PC = address (regs, x)})
+    | JSR x => (write16 (0wx100+w8ToW16 (#S regs), 0w2 + #PC regs); regs # {S = (#S regs)-0w2, PC = address (regs, x)})
     | LDA x => let val v = value (regs, x) in regs # {A = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | LDX x => let val v = value (regs, x) in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | LDY x => let val v = value (regs, x) in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
@@ -218,7 +218,7 @@ fun exec (regs, insn) =
     | NOP x => regs
     | ORA x => let val v1 = value (regs, x) val v2 = Word8.orb (#A regs, v1) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0)}} end
     | PHA x => (write (0wx100+w8ToW16 (#S regs), #A regs); regs # {S = (#S regs)-0w1})
-    | PHP x => (write (0wx100+w8ToW16 (#S regs), p2Word (#P regs)); regs # {S = (#S regs)-0w1})
+    | PHP x => (write (0wx100+w8ToW16 (#S regs), Word8.orb (p2Word (#P regs), 0wx10)); regs # {S = (#S regs)-0w1})
     | PLA x => let val v =  read (0wx100 + w8ToW16 ((#S regs) + 0w1)) in regs # {A = v, S = (#S regs) + 0w1, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | PLP x => let val v =  Word8.orb (Word8.andb (read (0wx100 + w8ToW16 ((#S regs) + 0w1)), 0wxCF), Word8.andb (p2Word (#P regs), 0wx30)) in regs # {S = (#S regs) + 0w1, P = word2P v} end
     | ROL (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 * 0w2 + b2w (#C (#P regs)) in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0wx80) = 0wx80)}} end
@@ -409,16 +409,21 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
       | 0wxF9 => (SBC (Address (aby ())), pc + 0w3)  
       | 0wxFD => (SBC (Address (abx ())), pc + 0w3)
       | 0wxFE => (INC (Address (abx ())), pc + 0w3)   
-      | _     => raise FailedDecode
+      | _     =>  (print (Word16.toString pc ^ ":" 
+                 ^ Word8.toString (read pc) ^ " "
+                 ^ Word8.toString (read (0w1 + pc)) ^ " "
+                 ^ Word8.toString (read (0w2 + pc)) ^ "\n");
+                 raise FailedDecode)
     end
 
 fun prtRegs regs =
     print ( Word16.toString (#PC regs) 
+          ^ ( ":" ^ Word8.toString (read (#PC regs)) ^ " " ^ Word8.toString (read (0w1 + #PC regs)) ^ " " ^ Word8.toString (read (0w2 + #PC regs)) ^ "/")
           ^ "\tA:" ^ Word8.toString (#A regs)
-          ^ "/X:"  ^ Word8.toString (#X regs) 
-          ^ "/Y:"  ^ Word8.toString (#Y regs) 
-          ^ "/P:"  ^ Word8.toString (p2Word (#P regs))
-          ^ "/SP:" ^ Word8.toString (#S regs) 
+          ^ "X:"  ^ Word8.toString (#X regs) 
+          ^ "Y:"  ^ Word8.toString (#Y regs) 
+          ^ "P:"  ^ Word8.toString (p2Word (#P regs))
+          ^ "SP:" ^ Word8.toString (#S regs) 
           ^ "\n")
 
 
@@ -427,7 +432,7 @@ fun cpu regs =
       val (insn, pc2) = fetchAndDecode (#PC regs)
       val newRegs = exec (regs # {PC = pc2}, insn)
     in
-      (print (Word8.toString (read (#PC regs)) ^ "/"); prtRegs regs; cpu newRegs)
+      (prtRegs regs; cpu newRegs)
     end
 
 val sr  = {N=false, V=false, B5=true, B4=false, D=false, I=true, Z=false, C=false}
