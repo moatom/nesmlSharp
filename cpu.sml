@@ -79,25 +79,27 @@ datatype operand =
   | Address of address
 
 
-fun zpRead16 addr =
-    Word16.orb (w8ToW16 (rd (wram, addr)), Word16.<< (w8ToW16 (rd (wram, (addr+0wx1) mod 0wx100 )), 0wx8))
+fun samePageRead16 addr =
+    Word16.orb (w8ToW16 (rd (wram, addr)), Word16.<< (w8ToW16 (rd (wram, Word16.orb (Word16.andb (addr, 0wxff00), (addr+0wx1) mod 0wx100))), 0wx8))
 
 exception InvaildAccess
 (* val address : registers * address -> word16 *)
 fun address (regs, ZeroPage x) = w8ToW16 x
   | address (regs, Absolute x) = x
-  | address (regs, Relative x) = (#PC regs) + w8ToW16 x
-  | address (regs, Indirect x) = read16 x(* w8ToW16 (read x) *)
+  | address (regs, Relative x) = (#PC regs) + w8ToW16 x - (if x >= 0w128 then 0w256
+                                                           else 0w0)
+  | address (regs, Indirect x) = samePageRead16 x
   | address (regs, ZeroPageIndexedX x) = ((w8ToW16 x) + w8ToW16 (#X regs)) mod 0wx100
   | address (regs, ZeroPageIndexedY x) = ((w8ToW16 x) + w8ToW16 (#Y regs)) mod 0wx100
   | address (regs, AbsoluteIndexedX x) = x + w8ToW16 (#X regs)
   | address (regs, AbsoluteIndexedY x) = x + w8ToW16 (#Y regs)
-  | address (regs, IndexedIndirect x) = zpRead16 ((w8ToW16 x + w8ToW16 (#X regs)) mod 0wx100)
-  | address (regs, IndirectIndexed x) = (zpRead16 (w8ToW16 x)) + w8ToW16 (#Y regs)
+  | address (regs, IndexedIndirect x) = samePageRead16 ((w8ToW16 x + w8ToW16 (#X regs)) mod 0wx100)
+  | address (regs, IndirectIndexed x) = (samePageRead16 (w8ToW16 x)) + w8ToW16 (#Y regs)
   | address _ = raise InvaildAccess
 
 fun value (regs, Immediate x) = x
   | value (regs, Address a) = read (address (regs, a))
+
 
 (* valueしたいかどうか *)
 datatype instruction =
@@ -134,7 +136,7 @@ datatype instruction =
   | LDX of operand
   | LDY of operand
   | LSR of operand
-  | NOP of address
+  | NOP of operand
   | ORA of operand
   | PHA of address
   | PHP of address
@@ -401,7 +403,7 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
       | 0wxE6 => (INC (Address (zp ())), pc + 0w2)   
       | 0wxE8 => (INX Implied, pc + 0w1)
       | 0wxE9 => (SBC (imm ()), pc + 0w2)  
-      | 0wxEA => (NOP Implied, pc + 0w1)
+      | 0wxEA => (NOP (Address Implied), pc + 0w1)
       | 0wxEC => (CPX (Address (abs ())), pc + 0w3)
       | 0wxED => (SBC (Address (abs ())), pc + 0w3)
       | 0wxEE => (INC (Address (abs ())), pc + 0w3)  
@@ -412,7 +414,31 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
       | 0wxF8 => (SED Implied, pc + 0w1)
       | 0wxF9 => (SBC (Address (aby ())), pc + 0w3)  
       | 0wxFD => (SBC (Address (abx ())), pc + 0w3)
-      | 0wxFE => (INC (Address (abx ())), pc + 0w3)   
+      | 0wxFE => (INC (Address (abx ())), pc + 0w3)
+      (* some illegal opcodes for an test *)
+      | 0wx04 => (NOP (Address (zp())), pc + 0w2)   
+      | 0wx44 => (NOP (Address (zp())), pc + 0w2)   
+      | 0wx64 => (NOP (Address (zp())), pc + 0w2)   
+      | 0wx0C => (NOP (Address (abs())), pc + 0w3)   
+      | 0wx14 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wx34 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wx54 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wx74 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wxD4 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wxF4 => (NOP (Address (zpx())), pc + 0w2)   
+      | 0wx1A => (NOP (Address Implied), pc + 0w1)   
+      | 0wx3A => (NOP (Address Implied), pc + 0w1)   
+      | 0wx5A => (NOP (Address Implied), pc + 0w1)   
+      | 0wx7A => (NOP (Address Implied), pc + 0w1)   
+      | 0wxDA => (NOP (Address Implied), pc + 0w1)   
+      | 0wxFA => (NOP (Address Implied), pc + 0w1)   
+      | 0wx80 => (NOP (imm ()), pc + 0w2)   
+      | 0wx1C => (NOP (Address (abx ())), pc + 0w3)   
+      | 0wx3C => (NOP (Address (abx ())), pc + 0w3)   
+      | 0wx5C => (NOP (Address (abx ())), pc + 0w3)   
+      | 0wx7C => (NOP (Address (abx ())), pc + 0w3)   
+      | 0wxDC => (NOP (Address (abx ())), pc + 0w3)   
+      | 0wxFC => (NOP (Address (abx ())), pc + 0w3)          
       | _     =>  (print (Word16.toString pc ^ ":" 
                  ^ Word8.toString (read pc) ^ " "
                  ^ Word8.toString (read (0w1 + pc)) ^ " "
