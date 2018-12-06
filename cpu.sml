@@ -78,18 +78,22 @@ datatype operand =
     Immediate of word8
   | Address of address
 
+
+fun zpRead16 addr =
+    Word16.orb (w8ToW16 (rd (wram, addr)), Word16.<< (w8ToW16 (rd (wram, (addr+0wx1) mod 0wx100 )), 0wx8))
+
 exception InvaildAccess
 (* val address : registers * address -> word16 *)
 fun address (regs, ZeroPage x) = w8ToW16 x
   | address (regs, Absolute x) = x
   | address (regs, Relative x) = (#PC regs) + w8ToW16 x
-  | address (regs, Indirect x) = w8ToW16 (read x)
-  | address (regs, ZeroPageIndexedX x) = (w8ToW16 x) + w8ToW16 (#X regs)
-  | address (regs, ZeroPageIndexedY x) = (w8ToW16 x) + w8ToW16 (#Y regs)
+  | address (regs, Indirect x) = read16 x(* w8ToW16 (read x) *)
+  | address (regs, ZeroPageIndexedX x) = ((w8ToW16 x) + w8ToW16 (#X regs)) mod 0wx100
+  | address (regs, ZeroPageIndexedY x) = ((w8ToW16 x) + w8ToW16 (#Y regs)) mod 0wx100
   | address (regs, AbsoluteIndexedX x) = x + w8ToW16 (#X regs)
   | address (regs, AbsoluteIndexedY x) = x + w8ToW16 (#Y regs)
-  | address (regs, IndexedIndirect x) = read16 (w8ToW16 (x + (#X regs)))
-  | address (regs, IndirectIndexed x) = (read16 (w8ToW16 x)) + w8ToW16 (#Y regs)
+  | address (regs, IndexedIndirect x) = zpRead16 ((w8ToW16 x + w8ToW16 (#X regs)) mod 0wx100)
+  | address (regs, IndirectIndexed x) = (zpRead16 (w8ToW16 x)) + w8ToW16 (#Y regs)
   | address _ = raise InvaildAccess
 
 fun value (regs, Immediate x) = x
@@ -170,11 +174,11 @@ fun word2P w8 =
      V  = (Word8.andb (w8, 0wx40) = 0wx40),
      B5 = (Word8.andb (w8, 0wx20) = 0wx20),
      B4 = (Word8.andb (w8, 0wx10) = 0wx10),
-     D  = (Word8.andb (w8, 0wx04) = 0wx04),
-     I  = (Word8.andb (w8, 0wx03) = 0wx03),
+     D  = (Word8.andb (w8, 0wx08) = 0wx08),
+     I  = (Word8.andb (w8, 0wx04) = 0wx04),
      Z  = (Word8.andb (w8, 0wx02) = 0wx02),
      C  = (Word8.andb (w8, 0wx01) = 0wx01)}
-fun checkV (A, B, C): bool = not (w2b (Word8.>> ((Word8.xorb (A, B)), 0w7))) andalso w2b (Word8.>> ((Word8.xorb (A, C)), 0w7))
+fun checkV (A, B, C): bool = (not (w2b (Word8.>> (Word8.xorb (A, B), 0w7)))) andalso w2b (Word8.>> (Word8.xorb (A, C), 0w7))
 
 exception InvaildInstruction
 (* val exec : registers * instruction -> registers *)
@@ -209,7 +213,7 @@ fun exec (regs, insn) =
     | INX x => let val v = #X regs + 0w1 in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | INY x => let val v = #Y regs + 0w1 in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | JMP x => (regs # {PC = address (regs, x)})
-    | JSR x => (write16 (0wx100+w8ToW16 (#S regs), 0w2 + #PC regs); regs # {S = (#S regs)-0w2, PC = address (regs, x)})
+    | JSR x => (write16 (0wx100+w8ToW16 (#S regs), (#PC regs) - 0w1); regs # {S = (#S regs)-0w2, PC = address (regs, x)})
     | LDA x => let val v = value (regs, x) in regs # {A = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | LDX x => let val v = value (regs, x) in regs # {X = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
     | LDY x => let val v = value (regs, x) in regs # {Y = v, P = (#P regs) # {N = (Word8.andb (v, 0wx80) = 0wx80), Z = (v=0w0)}} end
@@ -226,8 +230,8 @@ fun exec (regs, insn) =
     | ROR (Address Accumulator) => let val v1 = (#A regs) val v2 = v1 div 0w2 + 0w128 * b2w (#C (#P regs)) in regs # {A = v2 ,P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}} end
     | ROR (Address x) => let val v1 = value (regs, Address x) val v2 = v1 div 0w2 + 0w128 * b2w (#C (#P regs)) in (write (address (regs, x), v2); regs # {P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), Z = (v2=0w0), C = (Word8.andb (v1, 0w1) = 0w1)}}) end
     | RTI x => let val v1 =  Word8.orb (Word8.andb (read (0wx100 + w8ToW16 ((#S regs) + 0w1)), 0wxCF), Word8.andb (p2Word (#P regs), 0wx30)) val v2 = read16 (0wx100 + w8ToW16 ((#S regs) + 0w2)) in regs # {PC = v2, S = (#S regs) + 0w3, P = word2P v1} end
-    | RTS x => (regs # {PC = read16 (0wx100 + w8ToW16 ((#S regs) + 0w1)), S = (#S regs) + 0w2})
-    | SBC x => let val v1 = 0w1 + Word8.notb (value (regs, x)) val v2 = v1 + #A regs - 0w1 + b2w (#C (#P regs)) in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), V = checkV (#A regs, v1, v2) ,Z = (v2=0w0), C = (v2 < #A regs)}} end
+    | RTS x => (regs # {PC = 0w1 + read16 (0wx100 + w8ToW16 ((#S regs) + 0w1)), S = (#S regs) + 0w2})
+    | SBC x => let val v1 = 0w1 + Word8.notb (value (regs, x))  - 0w1 + b2w (#C (#P regs)) val v2 = v1 + #A regs in regs # {A = v2, P = (#P regs) # {N = (Word8.andb (v2, 0wx80) = 0wx80), V = checkV (#A regs, v1, v2) ,Z = (v2=0w0), C = (v2 < #A regs)}} end
     | SEC x => (regs # {P = (#P regs) # {C = true}})
     | SED x => (regs # {P = (#P regs) # {D = true}})
     | SEI x => (regs # {P = (#P regs) # {I = true}})
@@ -416,23 +420,23 @@ fun fetchAndDecode (pc: word16): instruction * word16 =
                  raise FailedDecode)
     end
 
+fun alignDigit w = (if 0wx0 <= w andalso w <= 0wxF then "0" else "") ^ Word8.toString w
 fun prtRegs regs =
     print ( Word16.toString (#PC regs) 
-          ^ ( ":" ^ Word8.toString (read (#PC regs)) ^ " " ^ Word8.toString (read (0w1 + #PC regs)) ^ " " ^ Word8.toString (read (0w2 + #PC regs)) ^ "/")
-          ^ "\tA:" ^ Word8.toString (#A regs)
-          ^ "X:"  ^ Word8.toString (#X regs) 
-          ^ "Y:"  ^ Word8.toString (#Y regs) 
-          ^ "P:"  ^ Word8.toString (p2Word (#P regs))
-          ^ "SP:" ^ Word8.toString (#S regs) 
+          (* ^ ( ":" ^ Word8.toString (read (#PC regs)) ^ " " ^ Word8.toString (read (0w1 + #PC regs)) ^ " " ^ Word8.toString (read (0w2 + #PC regs))) *)
+          ^ " A:"  ^ alignDigit (#A regs)
+          ^ " X:"  ^ alignDigit (#X regs) 
+          ^ " Y:"  ^ alignDigit (#Y regs) 
+          ^ " P:"  ^ Word8.toString (p2Word (#P regs))
+          ^ " SP:" ^ Word8.toString (#S regs) 
           ^ "\n")
-
 
 fun cpu regs =
     let
       val (insn, pc2) = fetchAndDecode (#PC regs)
       val newRegs = exec (regs # {PC = pc2}, insn)
     in
-      (prtRegs regs; cpu newRegs)
+      (prtRegs regs; cpu newRegs)(* 命令フェッチ前のレジスタ値を表示する *)
     end
 
 val sr  = {N=false, V=false, B5=true, B4=false, D=false, I=true, Z=false, C=false}
