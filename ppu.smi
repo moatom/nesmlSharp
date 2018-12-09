@@ -1,0 +1,6 @@
+_require "basis.smi"
+
+structure PPU =
+struct
+  val ppu : cycle -> unit
+end

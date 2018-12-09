@@ -1,0 +1,7 @@
+_require "basis.smi"
+_require "./cpu.smi"
+
+structure Mapper =
+struct
+    val init : unit -> unit
+end

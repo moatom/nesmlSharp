@@ -1,1 +1,125 @@
 _require "basis.smi"
+
+structure CPU =
+struct
+  val wram : word8 array
+  val ppuRegisters : word8 array
+  val cartridge : word8 array
+
+  val w8ToW16 : word8 -> word16
+  (* val w16ToW8 : word16 -> word8 *)
+  val rd : word8 array * word16 -> word8
+  val rd16 : word8 array * word16 -> word16
+  val wr : word8 array * word16 * word8 -> unit
+  val wr16 : word8 array * word16 * word16 -> unit
+  exception MemFault
+  val read : word16 -> word8 
+  val read16 : word16 -> word16
+  val write : word16 * word8 -> unit
+  val write16 : word16 * word16 -> unit
+  type statusRegister = {N: bool, V: bool, B5: bool, B4: bool, D: bool, I: bool, Z: bool, C: bool}
+  type registers = {A: word8, X: word8, Y: word8, PC: word16, S: word8, P: statusRegister}
+
+  datatype address =
+      Implied
+    | Accumulator
+    | ZeroPage of word8
+    | Absolute of word16
+    | Relative of word8
+    | Indirect of word16
+    | ZeroPageIndexedX of word8
+    | ZeroPageIndexedY of word8
+    | AbsoluteIndexedX of word16
+    | AbsoluteIndexedY of word16
+    | IndexedIndirect of word8
+    | IndirectIndexed of word8
+
+  datatype operand =
+      Immediate of word8
+    | Address of address
+
+  (* 
+  val samePageRead16 : word16 -> word16
+  val isCrossed : word16 * word16 -> bool
+  exception InvaildAccess
+  val address : registers * address -> word16
+  val conditionalAddress : registers * address -> word16 * bool
+  val value : registers * operand -> word8 
+  val conditionalValue registers * operand -> word8 * bool
+  *)
+
+  datatype instruction =
+      ADC of operand
+    | AND of operand
+    | ASL of operand
+    | BCC of address
+    | BCS of address
+    | BEQ of address
+    | BIT of operand	
+    | BMI of address
+    | BNE of address
+    | BPL of address
+    | BRK of address
+    | BVC of address
+    | BVS of address
+    | CLC of address
+    | CLD of address
+    | CLI of address
+    | CLV of address
+    | CMP of operand
+    | CPX of operand
+    | CPY of operand
+    | DEC of operand
+    | DEX of address
+    | DEY of address
+    | EOR of operand
+    | INC of operand
+    | INX of address
+    | INY of address
+    | JMP of address
+    | JSR of address
+    | LDA of operand
+    | LDX of operand
+    | LDY of operand
+    | LSR of operand
+    | NOP of operand
+    | ORA of operand
+    | PHA of address
+    | PHP of address
+    | PLA of address
+    | PLP of address
+    | ROL of operand
+    | ROR of operand
+    | RTI of address
+    | RTS of address
+    | SBC of operand
+    | SEC of address
+    | SED of address
+    | SEI of address
+    | STA of address
+    | STX of address
+    | STY of address
+    | TAX of address
+    | TAY of address
+    | TSX of address
+    | TXA of address
+    | TXS of address
+    | TYA of address
+
+  val b2w : bool -> word8
+  val b2i : bool -> int
+  (* val w2b : word8 -> bool *)
+  val p2Word : statusRegister -> word8
+  val word2P : word8 -> statusRegister
+  val checkV : word8 * word8 * word8 -> bool
+  
+  exception InvaildInstruction
+  val exec : registers * instruction -> registers * int
+
+  exception FailedDecode
+  val fetchAndDecode : word16 -> instruction * word16 * int
+
+  val alignDigit : word8 -> string
+  val prtRegs : registers -> unit
+  val cpu : registers -> registers * int
+end
