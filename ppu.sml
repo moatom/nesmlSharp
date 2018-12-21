@@ -49,17 +49,21 @@ struct
                       then c * Common.pow (10, d)
                     else 0
               in
-                  getBoolDigi (a,  0wx1, n, 8)
-                + getBoolDigi (a,  0wx2, n, 7)
-                + getBoolDigi (a,  0wx4, n, 6)
-                + getBoolDigi (a,  0wx8, n, 5)
+                  getBoolDigi (a,  0wx1, n, 0)
+                + getBoolDigi (a,  0wx2, n, 1)
+                + getBoolDigi (a,  0wx4, n, 2)
+                + getBoolDigi (a,  0wx8, n, 3)
                 + getBoolDigi (a, 0wx10, n, 4)
-                + getBoolDigi (a, 0wx20, n, 3)
-                + getBoolDigi (a, 0wx40, n, 2)
-                + getBoolDigi (a, 0wx80, n, 1)
+                + getBoolDigi (a, 0wx20, n, 5)
+                + getBoolDigi (a, 0wx40, n, 6)
+                + getBoolDigi (a, 0wx80, n, 7)
               end
         in
+          (* タイルの1ラインずつを合成して格納 *)
           (Array.update (array, n, dodo (low, 1) + dodo (high, 2));
+          (* print ("a" ^ Word8.toString low ^ "\n");
+          print ("b" ^ Word8.toString high ^ "\n");
+          print (Int.toString (dodo (low, 1) + dodo (high, 2)) ^"\n"); *)
            synthTile i (j+1) array (n+1))
         end
 
@@ -93,7 +97,7 @@ struct
         val pnt = traceAt 0 0 (Array.array (16*15, 0w0:word8))(* Palettes Number resolution Table for blocks *)
         
         fun toGlay c =
-            (Word.>> (c, 0w4) + (Word.>> (c, 0w2) mod 0wx100) +  (c mod 0wx100)) div 0w3
+            (Word.>> (c, 0w32) + (Word.>> (c, 0w16) mod 0wx100) +  (c mod 0wx100)) div 0w3
         fun getColor (pn,  0) = toGlay (Vector.sub (colors, Word8.toInt (read (0wx3F00))))
           | getColor (pn, cn) = toGlay (Vector.sub (colors, Word8.toInt (read (0wx3F01 + w8ToW16 ((0w4*pn - 0w1 + Word8.fromInt cn))))))
         fun render 7680 t b = frameBuf
@@ -121,6 +125,7 @@ struct
                 Array.update (frameBuf, pos + 5, getColor (pN, c5));
                 Array.update (frameBuf, pos + 6, getColor (pN, c6));
                 Array.update (frameBuf, pos + 7, getColor (pN, c7));
+                (* print (Word.toString (getColor (pN, c0)) ^ "\n"); *)
                 render (l+1) (if l mod 8 = 7 then t+1 else t) (case b of
                                                                         119 => 0
                                                                       | _   => if t mod 2 = 1 then b+1 else b)

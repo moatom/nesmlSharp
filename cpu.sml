@@ -473,6 +473,8 @@ struct
         val (insn, nextPc, baseCycle) = fetchAndDecode (#PC regs)
         val (newRegs, additionalCycle) = exec (regs # {PC = nextPc}, insn)
       in
-        (prtRegs (regs, cycle); (newRegs, cycle + baseCycle + additionalCycle))
+        (* (prtRegs (regs, cycle);  *)
+        (newRegs, cycle + baseCycle + additionalCycle)
+        (* ) *)
       end
 end
