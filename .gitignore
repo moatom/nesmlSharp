@@ -5,3 +5,5 @@ dump.txt
 refDump.txt
 *.o
 main
+SDL
+.vscode

@@ -24,15 +24,14 @@ struct
     | ioWrite (0wx2004, value) = ()
     | ioWrite (0wx2005, value) = ()
     | ioWrite (0wx2006, value) = buf2006 := Word16.orb (Word16.<< (!buf2006, 0w8), w8ToW16 value)
-    | ioWrite (0wx2007, value) = write (!buf2006, value)
+    | ioWrite (0wx2007, value) = (write (!buf2006, value); buf2006 := !buf2006 + 0w1)
 
   val colors = Vector.fromList [ 
-      0wx545454, 0wx1e74, 0wx81090, 0wx300088, 0wx440064, 0wx5c0030, 0wx540400, 0wx3c1800, 0wx202a00, 0wx83a00, 0wx4000, 0wx3c00, 0wx323c, 0wx0, 0wx989698,
-      0wx84cc4, 0wx3032ec, 0wx5c1ee4, 0wx8814b0, 0wxa01464, 0wx982220, 0wx783c00, 0wx545a00, 0wx287200, 0wx87c00, 0wx7628, 0wx6678, 0wx0, 0wxeceeec, 0wx4c9aec,
-      0wx787cec, 0wxb062ec, 0wxe454ec, 0wxec58b4, 0wxec6a64, 0wxd48820, 0wxa0aa00, 0wx74c400, 0wx4cd020, 0wx38cc6c, 0wx38b4cc, 0wx3c3c3c, 0wxeceeec, 0wxa8ccec, 0wxbcbcec, 
-      0wxd4b2ec, 0wxecaeec, 0wxecaed4, 0wxecb4b0, 0wxe4c490, 0wxccd278, 0wxb4de78, 0wxa8e290, 0wx98e2b4, 0wxa0d6e4, 0wxa0a2a0]
+      0wx545454, 0wx1e74, 0wx81090, 0wx300088, 0wx440064, 0wx5c0030, 0wx540400, 0wx3c1800, 0wx202a00, 0wx83a00, 0wx4000, 0wx3c00, 0wx323c, 0wx0, 0wx0, 0wx0,
+      0wx989698, 0wx84cc4, 0wx3032ec, 0wx5c1ee4, 0wx8814b0, 0wxa01464, 0wx982220, 0wx783c00, 0wx545a00, 0wx287200, 0wx87c00, 0wx7628, 0wx6678, 0wx0, 0wx0, 0wx0,
+      0wxeceeec, 0wx4c9aec, 0wx787cec, 0wxb062ec, 0wxe454ec, 0wxec58b4, 0wxec6a64, 0wxd48820, 0wxa0aa00, 0wx74c400, 0wx4cd020, 0wx38cc6c, 0wx38b4cc, 0wx3c3c3c, 0wx0, 0wx0,
+      0wxeceeec, 0wxa8ccec, 0wxbcbcec, 0wxd4b2ec, 0wxecaeec, 0wxecaed4, 0wxecb4b0, 0wxe4c490, 0wxccd278, 0wxb4de78, 0wxa8e290, 0wx98e2b4, 0wxa0d6e4, 0wxa0a2a0, 0wx0, 0wx0]
 
-      
   fun synthTile 960 j array n = array
     | synthTile i j array n =
       if  j = 8
@@ -61,9 +60,9 @@ struct
         in
           (* タイルの1ラインずつを合成して格納 *)
           (Array.update (array, n, dodo (low, 1) + dodo (high, 2));
-          (* print ("a" ^ Word8.toString low ^ "\n");
-          print ("b" ^ Word8.toString high ^ "\n");
-          print (Int.toString (dodo (low, 1) + dodo (high, 2)) ^"\n"); *)
+          (* print ("a" ^ Word8.toString low ^ "\n"); *)
+          (* print ("b" ^ Word8.toString high ^ "\n"); *)
+          (* print (Int.toString (dodo (low, 1) + dodo (high, 2)) ^"\n"); *)
            synthTile i (j+1) array (n+1))
         end
 
@@ -76,15 +75,15 @@ struct
       in
         ((if i < 56 then
           ( (* br *)
-            Common.wr (array, Word16.fromInt (base+16) ,Word8.>> (at, 0w6));
+            Common.wr (array, Word16.fromInt (base+17) ,Word8.>> (at, 0w6));
             (* bl *)
-            Common.wr (array, Word16.fromInt (base+17) ,Word8.>> (Word8.andb (at, 0wx3f), 0w4))
+            Common.wr (array, Word16.fromInt (base+16) ,Word8.>> (Word8.andb (at, 0wx3f), 0w4))
           )
           else ());
           (* tr *)
-          Common.wr (array, Word16.fromInt base, Word8.>> (Word8.andb (at, 0wx0f), 0w2));
+          Common.wr (array, Word16.fromInt (base+1), Word8.>> (Word8.andb (at, 0wx0f), 0w2));
           (* tl *)
-          Common.wr (array, Word16.fromInt (base+1), Word8.andb (at, 0wx03));
+          Common.wr (array, Word16.fromInt base, Word8.andb (at, 0wx03));
 
           traceAt (i+1) (if i mod 8 = 7 then j+1 else j) array
         )
@@ -106,7 +105,7 @@ struct
               (* タイルのラインについて処理していく *)
               val cN = Array.sub (bitmap, l)
               val pN = Array.sub (pnt, b)
-              val pos = (l div 256)*2048 + 8*(t mod 32)
+              val pos = (l div 256)*2048 + 8*(t mod 32) + (l mod 8)*256
               (* pixel 0-7 *)
               val c0 =  cN div Common.pow (10, 7)
               val c1 = (cN div Common.pow (10, 6)) mod 10
@@ -125,10 +124,14 @@ struct
                 Array.update (frameBuf, pos + 5, getColor (pN, c5));
                 Array.update (frameBuf, pos + 6, getColor (pN, c6));
                 Array.update (frameBuf, pos + 7, getColor (pN, c7));
+                (* print (Int.toString c0 ^ "\n"); *)
                 (* print (Word.toString (getColor (pN, c0)) ^ "\n"); *)
-                render (l+1) (if l mod 8 = 7 then t+1 else t) (case b of
-                                                                        119 => 0
-                                                                      | _   => if t mod 2 = 1 then b+1 else b)
+                (* if t >= 0 then print (Int.toString b ^ "hey!\n") else (); *)
+                render (l+1) (if l mod 8 = 7 then t+1 else t) (if l mod 8 = 7 then 
+                                                                if  t = (t div 64) * 64 + 1 + 30 then (t div 64) * 16
+                                                                else if t mod 2 = 1 then b+1
+                                                                else b
+                                                               else b)
               )
             end
       in
