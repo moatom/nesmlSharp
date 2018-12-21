@@ -1,8 +1,8 @@
 structure CPU =
 struct
-  val wram : word8 array = Array.array (4 * Word.toInt 0wx800, 0wx0: word8)
+  val wRam : word8 array = Array.array (4 * Word.toInt 0wx800, 0wx0: word8)
   val ppuRegisters : word8 array = Array.array (Word.toInt (0wx8+0wx1FF8), 0wx0: word8)
-  val cartridge : word8 array = Array.array (Word.toInt 0wxBFE0, 0wx0: word8)
+  val prgRom : word8 array = Array.array (Word.toInt 0wxBFE0, 0wx0: word8)
 
   fun w8ToW16 w8 = Word16.fromInt (Word8.toInt w8)
   fun w16ToW8 w16 = Word8.fromInt (Word16.toInt w16)
@@ -19,23 +19,24 @@ struct
       end
   exception MemFault
   fun read (addr: word16): word8 =
-          if addr < 0wx2000 then rd (wram, addr)
+           if addr < 0wx2000 then rd (wRam, addr)
       else if addr < 0wx4000 then rd (ppuRegisters, addr-0wx2000)
       else if addr < 0wx4020 then raise MemFault
-      else if addr < 0wxFFFF then rd (cartridge, addr-0wx4020)
+      else if addr < 0wxFFFF then rd (prgRom, addr-0wx4020)
       else raise MemFault
   fun read16 (addr: word16): word16 =
-          if addr < 0wx2000 then rd16 (wram, addr)
+           if addr < 0wx2000 then rd16 (wRam, addr)
       else if addr < 0wx4020 then raise MemFault
-      else if addr < 0wxFFFF then rd16 (cartridge, addr-0wx4020)
+      else if addr < 0wxFFFF then rd16 (prgRom, addr-0wx4020)
       else raise MemFault
   fun write (addr, value) : unit =
-          if addr < 0wx2000 then wr (wram, addr, value)
+           if addr < 0wx2000 then wr (wRam, addr, value)
+      else if addr < 0wx2008 then PPU.ioWrite (addr, value)
       else if addr < 0wx4020 then raise MemFault
       else if addr < 0wxFFFF then raise MemFault
       else raise MemFault
   fun write16 (addr, value) : unit =
-          if addr < 0wx2000 then wr16 (wram, addr, value)
+           if addr < 0wx2000 then wr16 (wRam, addr, value)
       else if addr < 0wx4020 then raise MemFault
       else if addr < 0wxFFFF then raise MemFault
       else raise MemFault
@@ -63,7 +64,7 @@ struct
 
 
   fun samePageRead16 addr =
-      Word16.orb (w8ToW16 (rd (wram, addr)), Word16.<< (w8ToW16 (rd (wram, Word16.orb (Word16.andb (addr, 0wxff00), (addr+0wx1) mod 0wx100))), 0wx8))
+      Word16.orb (w8ToW16 (rd (wRam, addr)), Word16.<< (w8ToW16 (rd (wRam, Word16.orb (Word16.andb (addr, 0wxff00), (addr+0wx1) mod 0wx100))), 0wx8))
 
   fun isCrossed (a, b) = Word16.andb (a, 0wxff00) <> Word16.andb (b, 0wxff00)
 
@@ -456,7 +457,7 @@ struct
       end
 
   fun alignDigit w = (if 0wx0 <= w andalso w <= 0wxF then "0" else "") ^ Word8.toString w
-  fun prtRegs regs =
+  fun prtRegs (regs, cycle) =
       print ( Word16.toString (#PC regs)
             ^ ( ":" ^ Word8.toString (read (#PC regs)) ^ " " ^ Word8.toString (read (0w1 + #PC regs)) ^ " " ^ Word8.toString (read (0w2 + #PC regs)))
             ^ " A:"  ^ alignDigit (#A regs)
@@ -464,13 +465,14 @@ struct
             ^ " Y:"  ^ alignDigit (#Y regs)
             ^ " P:"  ^ Word8.toString (p2Word (#P regs))
             ^ " SP:" ^ Word8.toString (#S regs)
+            ^ " CYC:" ^ Int.toString cycle
             ^ "\n")
 
-  fun cpu regs =
+  fun cpu (regs, cycle) =
       let
         val (insn, nextPc, baseCycle) = fetchAndDecode (#PC regs)
         val (newRegs, additionalCycle) = exec (regs # {PC = nextPc}, insn)
       in
-        (prtRegs regs; (newRegs, baseCycle + additionalCycle))
+        (prtRegs (regs, cycle); (newRegs, cycle + baseCycle + additionalCycle))
       end
 end

@@ -1,0 +1,9 @@
+_require "basis.smi"
+
+structure Common =
+struct
+  val rd : word8 array * word16 -> word8
+  val wr : word8 array * word16 * word8 -> unit
+  exception MemFault
+  val pow : int * int -> int
+end

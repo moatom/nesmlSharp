@@ -1,6 +1,14 @@
 _require "basis.smi"
+_require "common.smi"
 
 structure PPU =
 struct
-  val ppu : cycle -> unit
+  val chrRom : word8 array
+  val vRam : word8 array
+
+  val read : word16 -> word8
+  val write : word16 * word8 -> unit
+  val ioWrite : word16 * word8 -> unit
+
+  val ppu : unit -> word32 array
 end

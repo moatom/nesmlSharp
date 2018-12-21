@@ -1,10 +1,11 @@
 _require "basis.smi"
+_require "ppu.smi"
 
 structure CPU =
 struct
-  val wram : word8 array
+  val wRam : word8 array
   val ppuRegisters : word8 array
-  val cartridge : word8 array
+  val prgRom : word8 array
 
   val w8ToW16 : word8 -> word16
   (* val w16ToW8 : word16 -> word8 *)
@@ -120,6 +121,6 @@ struct
   val fetchAndDecode : word16 -> instruction * word16 * int
 
   val alignDigit : word8 -> string
-  val prtRegs : registers -> unit
-  val cpu : registers -> registers * int
+  val prtRegs : registers * int -> unit
+  val cpu : registers * int -> registers * int
 end

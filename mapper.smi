@@ -1,5 +1,6 @@
 _require "basis.smi"
 _require "./cpu.smi"
+_require "./ppu.smi"
 
 structure Mapper =
 struct
