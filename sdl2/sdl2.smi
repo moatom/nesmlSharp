@@ -1,0 +1,87 @@
+_require "basis.smi"
+_require "ffi.smi"
+
+structure SDL =
+struct
+  type SDL_Rect = {1_x:int, 2_y:int, 3_w:int, 4_h:int}
+  val getTicks : unit -> word32
+  val delay : word32 -> unit
+  exception SDL of string
+  eqtype SDL_InitFlags (= word32)
+  val SDL_INIT_VIDEO : SDL_InitFlags
+  val initFlags : SDL_InitFlags list -> SDL_InitFlags
+  val init : SDL_InitFlags -> unit
+  val quit : unit -> unit
+  type SDL_Window (= ptr)
+  type SDL_Renderer (= ptr)
+  type SDL_Surface (= ptr)
+  type SDL_Texture (= ptr)
+  type SDL_WindowFlags (= word32)
+  val windowFlags : SDL_WindowFlags list -> SDL_WindowFlags
+  val SDL_WINDOW_OPENGL : SDL_WindowFlags
+  val SDL_WINDOW_SHOWN : SDL_WindowFlags
+  val SDL_WINDOW_RESIZABLE : SDL_WindowFlags
+  val SDL_WINDOW_ALLOW_HIGHDPI : SDL_WindowFlags
+  val SDL_WINDOWPOS_UNDEFINED : int
+  val createWindow : string * int * int * int * int * SDL_WindowFlags
+                     -> SDL_Window
+  val destroyWindow : SDL_Window -> unit
+  val getWindowSize : SDL_Window -> int * int
+  type SDL_GLattr (= int)
+  val SDL_GL_DOUBLEBUFFER : SDL_GLattr
+  val GL_setAttribute : SDL_GLattr * int -> unit
+  type SDL_GLContext (= ptr)
+  val GL_createContext : SDL_Window -> SDL_GLContext
+  val GL_setSwapInterval : int -> unit
+  val GL_swapWindow : SDL_Window -> unit
+  eqtype SDL_RendererFlags (= word32)
+  val rendererFlags : SDL_RendererFlags list -> SDL_RendererFlags
+  val SDL_RENDERER_ACCELERATED : SDL_RendererFlags
+  val SDL_RENDERER_PRESENTVSYNC : SDL_RendererFlags
+  val createRenderer : SDL_Window * int * SDL_RendererFlags -> SDL_Renderer
+  val destroyRenderer : SDL_Renderer -> unit
+  val getRendererOutputSize : SDL_Renderer -> int * int
+  val setRenderDrawColor : SDL_Renderer * word8 * word8 * word8 * word8 -> unit
+  val renderClear : SDL_Renderer -> unit
+  val renderCopy : SDL_Renderer * SDL_Texture * SDL_Rect * SDL_Rect -> unit
+  val renderPresent : SDL_Renderer -> unit
+  eqtype pixelFormat (= word32)
+  val SDL_PIXELFORMAT_ARGB8888 : pixelFormat
+  val SDL_PIXELFORMAT_RGBA8888 : pixelFormat
+  val SDL_PIXELFORMAT_ABGR8888 : pixelFormat
+  val SDL_PIXELFORMAT_BGRA8888 : pixelFormat
+  eqtype SDL_TextureAccess (= int)
+  val SDL_TEXTUREACCESS_STATIC : SDL_TextureAccess
+  val SDL_TEXTUREACCESS_STREAMING : SDL_TextureAccess
+  val createTexture : SDL_Renderer * pixelFormat * SDL_TextureAccess * int * int
+                      -> SDL_Texture
+  val destroyTexture : SDL_Texture -> unit
+  val lockTexture : SDL_Texture * SDL_Rect -> unit ptr
+  val unlockTexture : SDL_Texture -> unit
+  val updateTexture : ['a#unboxed. SDL_Texture * SDL_Rect * 'a array * int
+                                   -> unit]
+  val loadBMP : string -> SDL_Surface
+  val freeSurface : SDL_Surface -> unit
+  val createTextureFromSurface : SDL_Renderer * SDL_Surface -> SDL_Texture
+  type SDL_Event (= array)
+  eqtype SDL_EventType (= word32)
+  eqtype SDL_WindowEventID (= word32)
+  val SDL_QUIT : SDL_EventType
+  val SDL_WINDOWEVENT : SDL_EventType
+  val SDL_SYSWMEVENT : SDL_EventType
+  val SDL_KEYDOWN : SDL_EventType
+  val SDL_KEYUP : SDL_EventType
+  val SDL_MOUSEMOTION : SDL_EventType
+  val SDL_MOUSEBUTTONDOWN : SDL_EventType
+  val SDL_MOUSEBUTTONUP : SDL_EventType
+  val SDL_WINDOWEVENT_SIZE_CHANGED : SDL_WindowEventID
+  val eventType : SDL_Event -> SDL_EventType
+  val keysym : SDL_Event -> word32
+  val mouseX : SDL_Event -> word32
+  val mouseY : SDL_Event -> word32
+  val windowEvent : SDL_Event -> SDL_WindowEventID
+  val windowData1 : SDL_Event -> word32
+  val windowData2 : SDL_Event -> word32
+  val pollEvent : unit -> SDL_Event option
+
+end
