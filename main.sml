@@ -1,6 +1,6 @@
 val StatusRegister  = {N=false, V=false, B5=true, B4=false, D=false, I=true, Z=false, C=false}
 type cpuData = {regs : CPU.registers, cycle : int}
-val CYCLES_PER_FRAME = 263 * 341 div 3 - 1 
+val CYCLES_PER_FRAME = 263 * 341 div 3
 
 val srect = {1_x = 0, 2_y = 0, 3_w = 256, 4_h = 240}
     (* fun grad i =
@@ -24,7 +24,7 @@ val r = SDL.createRenderer (w, ~1, SDL.rendererFlags
 val (width, height) = SDL.getRendererOutputSize r
 val rrect = {1_x = 0, 2_y = 0, 3_w = width, 4_h = height}
 val t = SDL.createTexture (r,
-                          SDL.SDL_PIXELFORMAT_RGBA8888,
+                          SDL.SDL_PIXELFORMAT_RGB888,
                           SDL.SDL_TEXTUREACCESS_STATIC,
                           #3_w srect, #4_h srect)
 (* val a = Array.tabulate (#3_w srect * #4_h srect, grad) *)
@@ -100,6 +100,3 @@ fun run _ =
     )
 
 val _ = run ()
-
-
-

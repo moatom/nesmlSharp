@@ -140,6 +140,7 @@ struct
   val renderPresent = checkErrorByNegative o SDL_RenderPresent
 
   type pixelFormat = word32
+  val SDL_PIXELFORMAT_RGB888 = 0w370546692
   val SDL_PIXELFORMAT_ARGB8888 = 0wx16362004
   val SDL_PIXELFORMAT_RGBA8888 = 0wx16462004
   val SDL_PIXELFORMAT_ABGR8888 = 0wx16762004
