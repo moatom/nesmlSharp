@@ -4,5 +4,5 @@ _require "./ppu.smi"
 
 structure Mapper =
 struct
-    val init : unit -> unit
+    val init : string -> unit
 end

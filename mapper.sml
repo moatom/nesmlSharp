@@ -1,8 +1,8 @@
 structure Mapper =
 struct
-  fun init _ =
+  fun init name =
       let
-        val file = BinIO.openIn "./sample1/sample1.nes"
+        val file = BinIO.openIn ("./rom/" ^ name)
         val cartridge  : word8 vector = BinIO.inputAll file
         val _ = BinIO.closeIn file
 

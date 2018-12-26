@@ -106,7 +106,8 @@ struct
             let
               val a = Vector.sub (colors, Word8.toInt (read (0wx3F01 + w8ToW16 ((0w4*pn - 0w1 + Word8.fromInt cn)))))
             in
-              (print (Word.toString a ^ "\n"); a)
+              a
+              (* (print (Word.toString a ^ "\n"); a) *)
             end
 
         fun render 7680 t b = frameBuf

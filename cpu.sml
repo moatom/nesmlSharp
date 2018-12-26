@@ -75,6 +75,7 @@ struct
     | address (regs, ZeroPageIndexedX x) = ((w8ToW16 x) + w8ToW16 (#X regs)) mod 0wx100
     | address (regs, ZeroPageIndexedY x) = ((w8ToW16 x) + w8ToW16 (#Y regs)) mod 0wx100
     | address (regs, AbsoluteIndexedX x) = x + w8ToW16 (#X regs)
+    | address (regs, AbsoluteIndexedY x) = x + w8ToW16 (#Y regs)
     | address (regs, IndexedIndirect x) = samePageRead16 ((w8ToW16 x + w8ToW16 (#X regs)) mod 0wx100)
     | address (regs, IndirectIndexed x) = (samePageRead16 (w8ToW16 x)) + w8ToW16 (#Y regs)
     | address _ = raise InvaildAccess
@@ -190,8 +191,8 @@ struct
       | BNE x => if not (#Z (#P regs)) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = addr}, 1 + b2i isCrsd) end else (regs, 0)
       | BPL x => if not (#N (#P regs)) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = addr}, 1 + b2i isCrsd) end else (regs, 0)
       | BRK x => (write16 (0wx100 + w8ToW16 (#S regs), 0w1 + #PC regs); write (0wx100+w8ToW16 ((#S regs) - 0w2), p2Word (#P regs)); (regs # {S = (#S regs)-0w3, PC = read16 0wxFFFE, P = (#P regs) # {B4=true, I=true}}, 0))
-      | BVC x => if not (#V (#P regs)) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = address (regs, x)}, 1 + b2i isCrsd) end else (regs, 0)
-      | BVS x => if #V (#P regs) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = address (regs, x)}, 1 + b2i isCrsd) end else (regs, 0)
+      | BVC x => if not (#V (#P regs)) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = addr}, 1 + b2i isCrsd) end else (regs, 0)
+      | BVS x => if #V (#P regs) then let val (addr, isCrsd) = conditionalAddress (regs, x) in (regs # {PC = addr}, 1 + b2i isCrsd) end else (regs, 0)
       | CLC x => (regs # {P = (#P regs) # {C=false}}, 0)
       | CLD x => (regs # {P = (#P regs) # {D=false}}, 0)
       | CLI x => (regs # {P = (#P regs) # {I=false}}, 0)
@@ -473,8 +474,8 @@ struct
         val (insn, nextPc, baseCycle) = fetchAndDecode (#PC regs)
         val (newRegs, additionalCycle) = exec (regs # {PC = nextPc}, insn)
       in
-        (* (prtRegs (regs, cycle);  *)
+        (prtRegs (regs, cycle); 
         (newRegs, cycle + baseCycle + additionalCycle)
-        (* ) *)
+        )
       end
 end
