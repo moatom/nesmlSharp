@@ -1,3 +1,4 @@
+(* Most of the codes are given by UENO Katsuhiro *)
 _require "basis.smi"
 _require "ffi.smi"
 

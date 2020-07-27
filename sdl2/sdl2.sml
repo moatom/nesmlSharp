@@ -1,3 +1,4 @@
+(* Most of the codes are given by UENO Katsuhiro *)
 structure SDL =
 struct
 
