@@ -8,6 +8,7 @@ Install SML# (see https://www.pllab.riec.tohoku.ac.jp/smlsharp/?Download), then
 ```
 $ brew install sdl2
 $ make
+$ ./main emu.nes
 $ ./main sample1.nes
 ```
 The execution speed is very slow 😅
