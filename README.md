@@ -1,10 +1,10 @@
 # nesmlSharp
 This is a NES emulator which displays just a background like below.
 
-Roms are from http://hp.vector.co.jp/authors/VA042397/nes/sample.html.
+Free and legal ROMs are from http://hp.vector.co.jp/authors/VA042397/nes/sample.html.
 
 ## Usage
-Install SML# (see https://www.pllab.riec.tohoku.ac.jp/smlsharp/?Download), then
+Install SML# (see ~~https://www.pllab.riec.tohoku.ac.jp/smlsharp/?Download~~ https://smlsharp.github.io/ja/downloads/), then
 ```
 $ brew install sdl2
 $ make
